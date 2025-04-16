@@ -22,7 +22,6 @@ Once all of the test sketches and scripts have been run and all instructions fol
 
 And having created -via running scripts-:
 
-- `calibration/images/`
 - `undistortion_and_rectification/stereo_maps/`
 
 Clone llama.cpp into `computer/LLM` and `git checkout` the same commit if needed:
@@ -57,9 +56,11 @@ python CoT_Dec_PAL_tester_v2.py
 python CoT_Dec_PAL_tester_v3.py
 ```
 
-## LLM-controlled Web App
+## Full Robot Execution
 
-Finally, to deploy the LLM-controlled app, you can run:
+## Notes
+
+- Note to deploy the LLM-controlled app, you can run:
 
 ```
 cd Transformer.codes
@@ -67,4 +68,4 @@ npm i
 npm run dev
 ```
 
-- Note to save time, `Transformer.codes/` uses an adapted template from a lifelong [Cruip](https://cruip.com) subscription whose `public/`, `view/` code cannnot be openly shared. Feel free to add an open version if you're great at web design, though!
+- Keep in mind, to save time `Transformer.codes/` uses an adapted template from a lifelong [Cruip](https://cruip.com) subscription whose `public/`, `view/` code cannnot be openly shared. Feel free to add an open version if you're great at web design!
