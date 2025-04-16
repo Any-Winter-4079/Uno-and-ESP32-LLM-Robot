@@ -43,7 +43,7 @@ IPAddress subnet2(255, 255, 255, 0);        // Subnet mask
 ```
 const char* websocket_server_host1 = "192.168.1.174"; // Static IP to request from home network
 
-const char* websocket_server_host2 = "172.20.10.4";   // Static IP to request from the hotspot
+const char* websocket_server_host2 = "172.20.10.4";   // Static IP to request from hotspot
 ```
 
 - Code upload requires either USB-C port or USB-to-serial adapter with:
