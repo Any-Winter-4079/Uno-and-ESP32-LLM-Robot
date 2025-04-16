@@ -1,1 +1,8 @@
+# Ignore .DS_Store files (Mac)
 .DS_Store
+# Ignore virtual environment
+venv/
+# Ignore videos
+videos/
+# Ignore llama.cpp
+computer/LLM/llama.cpp/
