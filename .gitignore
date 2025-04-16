@@ -19,3 +19,9 @@ computer/face_recognition/1_test_images/
 computer/face_recognition/2_test_images/
 # Ignore LMM .env
 computer/LMM/.env
+# Ignore recorded_audio
+computer/audio/recorded_audio/
+# Ignore cloning_voice
+computer/audio/cloning_voice/
+# Ignore voice_for_stt
+computer/audio/voice_for_stt/
