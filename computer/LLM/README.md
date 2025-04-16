@@ -1,4 +1,6 @@
-##
+# Notes on the `LLM/` code:
+
+## Computer Setup
 
 Once:
 
@@ -32,18 +34,22 @@ cd llama.cpp
 git checkout 213701b5
 ```
 
-Place your model(s) under `llama.cpp/models`, e.g.,
+Place your model(s) under `llama.cpp/models`, e.g.:
 
 ```
 llama.cpp/models/Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-fp16.gguf
 llama.cpp/models/Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-q4.gguf
 ```
 
-Test running the model(s):
+And test running the model(s):
 
 ```
 make -j && ./llama-cli -m models/Phi-3-mini-4k-instruct-gguf/Phi-3-mini-4k-instruct-fp16.gguf -p "Building a website can be done in 10 simple steps:\nStep 1:" -n 400 -e
 ```
+
+## CoT/Dec/PAL/etc. Inference Tests
+
+Then, to test inference methods, run:
 
 ```
 python CoT_Dec_PAL_tester_v1.py
@@ -51,10 +57,14 @@ python CoT_Dec_PAL_tester_v2.py
 python CoT_Dec_PAL_tester_v3.py
 ```
 
+## LLM-controlled Web App
+
+Finally, to deploy the LLM-controlled app, you can run:
+
 ```
 cd Transformer.codes
 npm i
 npm run dev
 ```
 
-Note `Transformer.codes` uses a cruip.com template, not (fully) shared.
+- Note to save time, `Transformer.codes/` uses an adapted template from a lifelong [Cruip](https://cruip.com) subscription whose `public/`, `view/` code cannnot be openly shared. Feel free to add an open version if you're great at web design, though!
