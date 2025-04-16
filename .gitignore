@@ -6,8 +6,5 @@ venv/
 videos/
 # Ignore llama.cpp
 computer/LLM/llama.cpp/
-# Ignore everything in depth_anything
-computer/depth/depth_anything/*
-# But not these files
-!computer/depth/depth_anything/run.py
-!computer/depth/depth_anything/depth_anything/dpt.py
+computer/depth_and_face_recognition/production_database/
+computer/depth_and_face_recognition/yolov8n.pt
