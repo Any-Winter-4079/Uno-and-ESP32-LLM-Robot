@@ -6,5 +6,7 @@ venv/
 videos/
 # Ignore llama.cpp
 computer/LLM/llama.cpp/
+# Ignore production_database
 computer/depth_and_face_recognition/production_database/
+# Ignore yolov8n.pt
 computer/depth_and_face_recognition/yolov8n.pt
