@@ -17,3 +17,5 @@ computer/face_recognition/production_database/
 # Ignore face_recognition test images
 computer/face_recognition/1_test_images/
 computer/face_recognition/2_test_images/
+# Ignore LMM .env
+computer/LMM/.env
