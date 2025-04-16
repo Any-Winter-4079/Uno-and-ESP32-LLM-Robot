@@ -100,8 +100,8 @@ On the computer:
 Clone (and cd into) the repository:
 
 ```
-git clone https://github.com/Any-Winter-4079/LLM-Arduino-Robot.git
-cd LLM-Arduino-Robot
+git clone https://github.com/Any-Winter-4079/Uno-and-ESP32-LLM-Robot.git
+cd Uno-and-ESP32-LLM-Robot
 ```
 
 Create a virtual environment:
