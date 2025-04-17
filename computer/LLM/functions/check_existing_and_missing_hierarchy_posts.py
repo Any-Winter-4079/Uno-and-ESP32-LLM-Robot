@@ -10,6 +10,7 @@ Features:
 """
 
 import os
+import sys
 import json
 
 # Sample result
@@ -25,8 +26,10 @@ import json
 # ...
 
 # Configuration
-HIERARCHIES_BASE_PATH = "../Transformer.codes/hierarchies/"
-POSTS_DIR = "../Transformer.codes/posts/"
+computer_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(computer_dir)
+HIERARCHIES_BASE_PATH = os.path.join(computer_dir, 'LLM/Transformer.codes/hierarchies')
+POSTS_DIR = os.path.join(computer_dir, 'LLM/Transformer.codes/posts/')
 
 def get_leaf_nodes(node):
     """
@@ -84,5 +87,5 @@ def check_existing_and_missing_hierarchy_posts(hierarchy_file_name):
         print(f"- {post['name']}")
 
 if __name__ == "__main__":
-    hierarchy_path = f"{HIERARCHIES_BASE_PATH}/1.json"
+    hierarchy_path = os.path.join(HIERARCHIES_BASE_PATH, "1.json")
     check_existing_and_missing_hierarchy_posts(hierarchy_path)

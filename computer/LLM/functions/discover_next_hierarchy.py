@@ -10,12 +10,15 @@ Features:
 """
 
 import os
+import sys
 
 # Sample result
 # The next hierarchy file to create is: 2.json
 
 # Configuration
-HIERARCHIES_BASE_PATH = "../Transformer.codes/hierarchies/"
+computer_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(computer_dir)
+HIERARCHIES_BASE_PATH = os.path.join(computer_dir, 'LLM/Transformer.codes/hierarchies/')
 
 def discover_next_hierarchy():
     """

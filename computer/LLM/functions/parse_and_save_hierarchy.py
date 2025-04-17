@@ -9,10 +9,14 @@ Features:
 - Handles multi-level hierarchies with unlimited depth
 """
 
+import os
+import sys
 import json
 
 # Configuration
-BASE_FILE_PATH = "../Transformer.codes/hierarchies"
+computer_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(computer_dir)
+BASE_FILE_PATH = os.path.join(computer_dir, 'LLM/Transformer.codes/hierarchies')
 
 def parse_and_save_hierarchy(text):
     """
@@ -74,7 +78,7 @@ def parse_and_save_hierarchy(text):
         }
         
         # Save the resulting hierarchy to a JSON file
-        file_path = f'{BASE_FILE_PATH}/{root_index_base}.json'
+        file_path = os.path.join(BASE_FILE_PATH, f"{root_index_base}.json")
         with open(file_path, 'w') as json_file:
             json.dump(hierarchy, json_file, indent=4)
         
