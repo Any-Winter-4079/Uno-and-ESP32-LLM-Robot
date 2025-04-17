@@ -32,7 +32,8 @@ LEFT_EYE_IP = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"
 STREAM_TIMEOUT = 3               # seconds
 
 # Stereo vision parameters
-STEREO_MAPS_DIR = '../undistortion_and_rectification/stereo_maps'
+STEREO_MAPS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                              'undistortion_and_rectification/stereo_maps')
 ALLOWED_DEPTH = 0.875
 LABELS = ["bottle"]              # Object labels to track
 STEREO_BLOCK_SIZE = 11           # Must be odd

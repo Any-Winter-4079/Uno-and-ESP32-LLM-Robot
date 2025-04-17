@@ -4,7 +4,7 @@ from llama_cpp import Llama
 from datasets import load_dataset
 
 # Choices
-MODEL_TO_TEST = "mixtral-8x7b-instruct-q5_0" # Model to test
+MODEL_TO_TEST = "phi-3-mini-4k-instruct-q4" # Model to test
 TEMP = 0 # Temperature for the LLM
 N_SAMPLES = 2 # None for all samples
 PAL_TIMEOUT = 5 # Timeout for the PAL method
@@ -71,7 +71,7 @@ CONTEXT_WINDOWS = {
     "llama-3-8b-instruct": 8192,
     "phi-3-mini-4k-instruct-fp16": 4096,
     "phi-3-mini-4k-instruct-q4": 4096,
-    "phi-3-mini-128k-instruct-fp16": 131072,
+    "phi-3-mini-128k-instruct-fp16": 32768,
     "phi-3-small-8k-instruct-fp16": 8192,
     "phi-3-medium-4k-instruct-fp16": 4096,
     "phi-3-medium-4k-instruct-q4_k_m": 4096,
