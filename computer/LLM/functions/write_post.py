@@ -10,10 +10,13 @@ Features:
 """
 
 import os
+import sys
 import json
 
 # Configuration
-POSTS_DIR = "../Transformer.codes/posts/"
+computer_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(computer_dir)
+POSTS_DIR = os.path.join(computer_dir, 'LLM/Transformer.codes/posts/')
 
 # Function to write the generated post content to a JavaScript file (exporting it in JSON format)
 def write_post(file_name, post_content):

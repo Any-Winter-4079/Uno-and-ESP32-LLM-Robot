@@ -35,7 +35,6 @@ STREAM_TIMEOUT = 3               # seconds
 STEREO_MAPS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
                               'undistortion_and_rectification/stereo_maps')
 ALLOWED_DEPTH = 0.875
-LABELS = ["bottle"]              # Object labels to track
 STEREO_BLOCK_SIZE = 11           # Must be odd
 MIN_DISPARITY = 8
 NUM_DISPARITIES = 5 * 16         # Must be non-zero, divisible by 16
@@ -45,6 +44,9 @@ MODE = cv2.STEREO_SGBM_MODE_HH
 UNIQUENESS_RATIO = 0
 PRE_FILTER_CAP = 0
 DISP12MAX_DIFF = 32
+
+COCO_NAMES_DIR = os.path.dirname(os.path.abspath(__file__))
+LABELS = ["bottle"]              # Object labels to track
 
 # Face recognition settings
 DATABASE_PATH = "production_database"
@@ -95,15 +97,11 @@ stereo = cv2.StereoSGBM_create(minDisparity=MIN_DISPARITY,
                                speckleRange=SPECKLE_RANGE,
                                mode=MODE)
 
-# Initialize face detection
-mp_face_detection = mp.solutions.face_detection
-face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
-
 # Initialize object detection
 object_detection_model = YOLO("yolov8n.pt")
 
 # Load object class names
-with open("coco.names", "r") as f:
+with open(os.path.join(COCO_NAMES_DIR, 'coco.names'), "r") as f:
     classes = [line.strip() for line in f.readlines()]
 
 #############################
