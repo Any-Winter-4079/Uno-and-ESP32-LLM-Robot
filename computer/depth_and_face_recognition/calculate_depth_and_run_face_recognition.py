@@ -19,14 +19,13 @@ import requests
 import threading
 import numpy as np
 import urllib.request
-import mediapipe as mp
 from ultralytics import YOLO
 from deepface import DeepFace
 
 # Configuration
 JPEG_QUALITY = 12                # 0-63 lower means higher quality
 FRAME_SIZE = "FRAMESIZE_VGA"     # 640x480 resolution
-USE_HOTSPOT = False
+USE_HOTSPOT = True
 RIGHT_EYE_IP = "172.20.10.10" if USE_HOTSPOT else "192.168.1.180"
 LEFT_EYE_IP = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"
 STREAM_TIMEOUT = 3               # seconds
@@ -155,7 +154,6 @@ cv2.createTrackbar("Uniq. Ratio", "Disparity map", UNIQUENESS_RATIO, 60, on_uniq
 cv2.createTrackbar("Pre Filter Cap", "Disparity map", PRE_FILTER_CAP, 100, on_pre_filter_cap_change)
 cv2.createTrackbar("Disp12MaxDiff", "Disparity map", DISP12MAX_DIFF, 60, on_disp12max_diff_change)
 
-
 def draw_boxes_and_labels(img_rectified, unique_individuals):
     """
     Draws bounding boxes and name labels for recognized faces
@@ -283,50 +281,6 @@ def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
     except requests.RequestException as e:
         print(f"Error sending request: {e}")
 
-
-def get_face_centroid(image):
-    """
-    Detects face in image and returns its centroid coordinates
-    
-    Args:
-        image: Input image (BGR format)
-    
-    Returns:
-        tuple: (x, y) coordinates of face centroid or None if no face detected
-    """
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = face_detection.process(image_rgb)
-    if results.detections:
-        for detection in results.detections:
-            bboxC = detection.location_data.relative_bounding_box
-            x, y, w, h = bboxC.xmin, bboxC.ymin, bboxC.width, bboxC.height
-            centroid = (x + w / 2, y + h / 2)
-            return centroid
-    return None
-
-
-def get_face_bounding_box(image):
-    """
-    Detects face in image and returns its bounding box
-    
-    Args:
-        image: Input image (BGR format)
-    
-    Returns:
-        tuple: (x, y, w, h) coordinates of face or None if no face detected
-    """
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = face_detection.process(image_rgb)
-    if results.detections:
-        for detection in results.detections:
-            bboxC = detection.location_data.relative_bounding_box
-            x, y, w, h = bboxC.xmin, bboxC.ymin, bboxC.width, bboxC.height
-            height, width, _ = image.shape
-            x, y, w, h = int(x * width), int(y * height), int(w * width), int(h * height)
-            return (x, y, w, h)
-    return None
-
-
 def get_object_bounding_boxes(image, label_filter=None):
     """
     Detects objects in image and returns their bounding boxes and labels
@@ -416,23 +370,6 @@ def get_stereo_images(url_left, url_right):
     
     return img_left, img_right
 
-
-def rectify_images(img_left, img_right):
-    """
-    Applies stereo rectification to image pair
-    
-    Args:
-        img_left: Left camera image
-        img_right: Right camera image
-    
-    Returns:
-        tuple: (rectified_left, rectified_right)
-    """
-    img_left_rectified = cv2.remap(img_left, stereoMapL_x, stereoMapL_y, cv2.INTER_LINEAR)
-    img_right_rectified = cv2.remap(img_right, stereoMapR_x, stereoMapR_y, cv2.INTER_LINEAR)
-    return img_left_rectified, img_right_rectified
-
-
 def rectify_left_image(image):
     """
     Applies stereo rectification to left camera image
@@ -485,151 +422,88 @@ def calculate_disparity_maps(stereo, left_img_rectified, right_img_rectified):
     
     return disp_norm, points_3D
 
+def preprocess_frames():
+    """
+    Preprocesses stereo camera input, returning:
+    - rectified image used for display
+    - recognized face names (if any)
+    - object depth info (if stereo and available)
+    """
+    # Track stream health
+    img_left, img_right = get_stereo_images(esp32_left_image_url, esp32_right_image_url)
+
+    if img_left is None and img_right is None:
+        print("Both images are None.")
+        return None, None, None
+
+    img_left_rectified = rectify_left_image(img_left) if img_left is not None else None
+    img_right_rectified = rectify_right_image(img_right) if img_right is not None else None
+
+    if img_left_rectified is not None:
+        faces = recognize_face(img_left_rectified)
+        object_bboxes, object_labels = get_object_bounding_boxes(img_left_rectified, label_filter=LABELS)
+        img_rectified = img_left_rectified
+    elif img_right_rectified is not None:
+        faces = recognize_face(img_right_rectified)
+        object_bboxes, object_labels = get_object_bounding_boxes(img_right_rectified, label_filter=LABELS)
+        img_rectified = img_right_rectified
+    else:
+        return None, None, None
+
+    object_depths = None
+
+    if img_left_rectified is not None and img_right_rectified is not None:
+        if faces or (object_bboxes and len(object_bboxes) > 0):
+            disp_norm, points_3D = calculate_disparity_maps(stereo, img_left_rectified, img_right_rectified)
+
+            if faces:
+                draw_boxes_and_labels(img_left_rectified, faces)
+
+            object_depths = []
+            for bbox, label in zip(object_bboxes, object_labels):
+                x, y, w, h = bbox
+                cv2.rectangle(disp_norm, (x, y), (x + w, y + h), (255, 255, 255), 2)
+                cv2.putText(disp_norm, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                cv2.rectangle(img_left_rectified, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.putText(img_left_rectified, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+                depth = calculate_average_depth(points_3D, bbox, allowed_depth=ALLOWED_DEPTH)
+                object_depths.append((label, depth))
+                if depth is not None:
+                    cv2.putText(disp_norm, f"Depth: {depth:.2f}", (x, y + h + 15),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                    print(f"{label} detected. Average {label} depth: {depth:.2f}")
+
+            combined = np.concatenate((cv2.cvtColor(disp_norm, cv2.COLOR_GRAY2BGR), img_left_rectified), axis=1)
+            cv2.imshow("Disparity map", combined)
+        else:
+            cv2.imshow("Disparity map", img_left_rectified)
+
+    else:
+        if faces:
+            draw_boxes_and_labels(img_rectified, faces)
+        for bbox, label in zip(object_bboxes, object_labels):
+            x, y, w, h = bbox
+            cv2.rectangle(img_rectified, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(img_rectified, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        cv2.imshow("Disparity map", img_rectified)
+
+    return img_rectified, list(faces.keys()) if faces else None, object_depths
 
 def main():
     """
-    Main execution loop:
-    1. Configures cameras
-    2. Captures images from available cameras
-    3. Applies image rectification
-    4. Detects faces and objects in each image
-    5. Calculates stereo disparity and depth for detected objects
-    6. Performs face recognition on detected faces
-    7. Displays combined visualization with depth information
+    Main loop to call preprocess_frames() and handle display loop
     """
-    # Stream state tracking
-    stream_to_recover = False
-    stream_active = False
-
-    # Initialize camera configurations
     update_camera_config(esp32_left_config_url, JPEG_QUALITY, FRAME_SIZE)
     update_camera_config(esp32_right_config_url, JPEG_QUALITY, FRAME_SIZE)
-
-    # Pre-build face recognition model
     DeepFace.build_model(MODEL)
 
     while True:
-        # Handle stream recovery if needed
-        if stream_to_recover and stream_active:
-            print("Stream is being recovered.")
-            update_camera_config(esp32_left_config_url, JPEG_QUALITY, FRAME_SIZE)
-            update_camera_config(esp32_right_config_url, JPEG_QUALITY, FRAME_SIZE)
-            stream_to_recover = False
-            stream_active = False
-
-        # Fetch images from both cameras
-        img_left, img_right = get_stereo_images(esp32_left_image_url, esp32_right_image_url)
-
-        # Check if both images are missing
-        if img_left is None and img_right is None:
-            print("Both images are None.")
-            stream_to_recover = True
-            cv2.waitKey(500)
-            continue
-        
-        # Apply rectification to available images
-        if img_left is not None:
-            stream_active = True
-            img_left_rectified = rectify_left_image(img_left)
-        if img_right is not None:
-            stream_active = True
-            img_right_rectified = rectify_right_image(img_right)
-
-        # Detect faces and objects in left image if available
-        if img_left is not None:
-            left_face_bbox = get_face_bounding_box(img_left_rectified)
-            left_object_bboxes, left_object_labels = get_object_bounding_boxes(img_left_rectified, label_filter=LABELS)
-        
-        # Detect faces and objects in right image if available
-        if img_right is not None:
-            right_face_bbox = get_face_bounding_box(img_right_rectified)
-            right_object_bboxes, right_object_labels = get_object_bounding_boxes(img_right_rectified, label_filter=LABELS)
-
-        # Handle single-camera case
-        img_rectified_if_single = None
-        img_face_bbox_if_single = None
-        img_object_bboxes_if_single = None
-        img_object_labels_if_single = None
-        
-        if img_left is None and img_right is not None:
-            img_rectified_if_single = img_right
-            img_face_bbox_if_single = right_face_bbox
-            img_object_bboxes_if_single = right_object_bboxes
-            img_object_labels_if_single = right_object_labels
-        elif img_left is not None and img_right is None:
-            img_rectified_if_single = img_left
-            img_face_bbox_if_single = left_face_bbox
-            img_object_bboxes_if_single = left_object_bboxes
-            img_object_labels_if_single = left_object_labels
-
-        # Process stereo case (both cameras available)
-        if img_left is not None and img_right is not None:
-            
-            # Check if faces or objects detected in both images
-            if (left_face_bbox is not None and right_face_bbox is not None) or \
-                (len(left_object_bboxes) > 0 and len(right_object_bboxes) > 0):
-
-                # Calculate disparity and 3D points for depth estimation
-                disp_norm, points_3D = calculate_disparity_maps(stereo, img_left_rectified, img_right_rectified)
-
-                # Process detected face
-                if left_face_bbox is not None:
-                    x, y, w, h = left_face_bbox
-                    result = recognize_face(img_left_rectified)
-                    if result is not None:
-                        draw_boxes_and_labels(img_left_rectified, result)
-                    else:
-                        cv2.rectangle(img_left_rectified, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                
-                # Process detected objects
-                for bbox, label in zip(left_object_bboxes, left_object_labels):
-                    x, y, w, h = bbox
-                    
-                    # Draw on disparity map
-                    cv2.rectangle(disp_norm, (x, y), (x + w, y + h), (255, 255, 255), 2)
-                    cv2.putText(disp_norm, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-                    
-                    # Draw on color image
-                    cv2.rectangle(img_left_rectified, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    cv2.putText(img_left_rectified, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                    
-                    # Calculate and display depth
-                    average_object_depth = calculate_average_depth(points_3D, bbox, allowed_depth=ALLOWED_DEPTH)
-                    if average_object_depth is not None:
-                        cv2.putText(disp_norm, f"Depth: {average_object_depth:.2f}", (x, y + h + 15),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-                        print(f"{label} detected. Average {label} depth: {average_object_depth:.2f}")
-
-                # Create combined visualization
-                disp_norm_color = cv2.cvtColor(disp_norm, cv2.COLOR_GRAY2BGR)
-                combined = np.concatenate((disp_norm_color, img_left_rectified), axis=1)
-                cv2.imshow("Disparity map", combined)
-        
-        # Process single-camera case
-        elif img_rectified_if_single is not None:
-            
-            # Process detected face
-            if img_face_bbox_if_single is not None:
-                x, y, w, h = img_face_bbox_if_single
-                result = recognize_face(img_rectified_if_single)
-                if result is not None:
-                    draw_boxes_and_labels(img_rectified_if_single, result)
-                else:
-                    cv2.rectangle(img_rectified_if_single, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-            # Process detected objects
-            for bbox, label in zip(img_object_bboxes_if_single, img_object_labels_if_single):
-                x, y, w, h = bbox
-                cv2.rectangle(img_rectified_if_single, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.putText(img_rectified_if_single, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-            # Display single-camera view
-            cv2.imshow("Disparity map", img_rectified_if_single)
-
-        # Exit on 'q' key press
+        _, _, _ = preprocess_frames()  # Process and display
         if cv2.waitKey(5) & 0xFF == ord('q'):
             break
 
+    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()

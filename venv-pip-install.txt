@@ -8,13 +8,13 @@ pip install ultralytics
 pip install TTS -c tts-constraints.txt
 pip install openai
 pip install git+https://github.com/coqui-ai/TTS.git@dev
-pip install mediapipe
+pip install mediapipe==0.10.7
 pip install facenet-pytorch
 pip install llama_cpp_python==0.2.44
 pip install datasets
 pip install anthropic
 pip install python-dotenv
+pip install tf_keras
 pip install chromadb
 pip uninstall torch torchvision torchaudio
 pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
-pip install tf_keras

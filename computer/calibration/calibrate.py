@@ -29,7 +29,6 @@ objpoints = []          # 3D points in real-world space
 imgpoints_left = []     # 2D points in left image plane
 imgpoints_right = []    # 2D points in right image plane
 
-
 def extract_timestamp(filename):
     """
     Extracts timestamp from image filename
@@ -42,7 +41,6 @@ def extract_timestamp(filename):
     """
     match = re.search(r'(\d{8}_\d{6})', filename)
     return match.group(0) if match else None
-
 
 def show_side_by_side(img1, img2, window_name='Side-by-side', display_time=500):
     """
@@ -59,7 +57,6 @@ def show_side_by_side(img1, img2, window_name='Side-by-side', display_time=500):
     cv2.waitKey(display_time)
     cv2.destroyAllWindows()
 
-
 def save_side_by_side(img1, img2, filename, output_dir):
     """
     Saves two images concatenated side by side
@@ -72,7 +69,6 @@ def save_side_by_side(img1, img2, filename, output_dir):
     """
     combined_image = np.concatenate((img1, img2), axis=1)
     cv2.imwrite(os.path.join(output_dir, filename), combined_image)
-
 
 def process_image_pairs():
     """
@@ -151,7 +147,6 @@ def process_image_pairs():
 
     return grayL.shape[::-1], objpoints_reshaped, imgpoints_left_formatted, imgpoints_right_formatted
 
-
 def calibrate_cameras(img_size, objpoints, imgpoints_left, imgpoints_right):
     """
     Performs intrinsic and stereo calibration of the cameras
@@ -217,7 +212,6 @@ def calibrate_cameras(img_size, objpoints, imgpoints_left, imgpoints_right):
 
     return calibration
 
-
 def save_calibration(calibration):
     """
     Saves calibration parameters to files
@@ -240,7 +234,6 @@ def save_calibration(calibration):
     np.save('parameters/essential_matrix.npy', calibration['E'])
     np.save('parameters/fundamental_matrix.npy', calibration['F'])
 
-
 def main():
     """
     Main calibration process:
@@ -262,7 +255,6 @@ def main():
     # Save results
     save_calibration(calibration)
     print("Calibration completed and results saved.")
-
 
 if __name__ == "__main__":
     main()
