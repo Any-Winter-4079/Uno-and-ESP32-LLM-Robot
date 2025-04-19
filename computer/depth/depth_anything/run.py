@@ -1,14 +1,18 @@
+import os
+import sys
+# Add the outer depth_anything folder to sys.path
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
 import argparse
 import cv2
 import numpy as np
-import os
 import torch
 import torch.nn.functional as F
 from torchvision.transforms import Compose
 from tqdm import tqdm
 
-from depth_anything.depth_anything.dpt import DepthAnything
-from depth_anything.depth_anything.util.transform import Resize, NormalizeImage, PrepareForNet
+from .depth_anything.dpt import DepthAnything
+from .depth_anything.util.transform import Resize, NormalizeImage, PrepareForNet
 
 #################
 # Description   #

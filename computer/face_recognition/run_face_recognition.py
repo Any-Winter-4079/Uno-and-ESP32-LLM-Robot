@@ -12,19 +12,24 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import re
 import cv2
 import time
-import requests
 import threading
 import numpy as np
-import urllib.request
 from deepface import DeepFace
+from calibration.store_images_to_calibrate import update_camera_config
+from depth.calculate_depth_with_depth_anything import rectify_left_image, \
+    rectify_right_image, fetch_image_with_timeout
 
 # Configuration
 JPEG_QUALITY = 12                # 0-63 lower means higher quality
 FRAME_SIZE = "FRAMESIZE_VGA"     # 640x480 resolution
-USE_HOTSPOT = False
+USE_HOTSPOT = True
 RIGHT_EYE_IP = "172.20.10.10" if USE_HOTSPOT else "192.168.1.180"
 LEFT_EYE_IP = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"
 STREAM_TIMEOUT = 3               # seconds
@@ -67,7 +72,6 @@ stereoMapR_x = np.load(os.path.join(stereo_maps_dir, 'stereoMapR_x.npy'))
 stereoMapR_y = np.load(os.path.join(stereo_maps_dir, 'stereoMapR_y.npy'))
 Q = np.load(os.path.join(stereo_maps_dir, 'Q.npy'))
 
-
 def draw_boxes_and_labels(img_rectified, unique_individuals):
     """
     Draws bounding boxes and name labels for recognized faces
@@ -89,10 +93,9 @@ def draw_boxes_and_labels(img_rectified, unique_individuals):
         cv2.rectangle(img_rectified, (x, y), (x+w, y+h), (0, 255, 0), 2)
         cv2.putText(img_rectified, identity, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-
 def get_top_predictions(dfs_list):
     """
-    Extracts the top prediction for each detected face
+    Extracts top predictions from recognition results
     
     Args:
         dfs_list: List of dataframes containing recognition results
@@ -100,13 +103,17 @@ def get_top_predictions(dfs_list):
     Returns:
         list: Top prediction for each detected face
     """
+    # The list can have more than one dataframe if there are multiple faces.
+    # One dataframe per face.
+    # Each dataframe has one or more rows, from most likely to least likely
+    # while meeting the threshold.
     top_predictions = []
-    for df in dfs_list:
-        if len(df) > 0:
-            top_prediction = df.iloc[0]
-            top_predictions.append(top_prediction)
+    if dfs_list is not None:
+        for df in dfs_list:
+            if len(df) > 0:
+                top_prediction = df.iloc[0]
+                top_predictions.append(top_prediction)
     return top_predictions
-
 
 def process_predictions(top_predictions):
     """
@@ -128,7 +135,6 @@ def process_predictions(top_predictions):
         if person_name not in unique_individuals:
             unique_individuals[person_name] = prediction
     return unique_individuals
-
 
 def recognize_face(test_image_path):
     """
@@ -159,49 +165,6 @@ def recognize_face(test_image_path):
         print(f"\nAn error occurred recognizing {test_image_path} with model {MODEL} and backend {BACKEND}: {e}\n")
         return None
 
-
-def fetch_image_with_timeout(url, queue, timeout=STREAM_TIMEOUT):
-    """
-    Fetches an image from a camera URL with timeout protection
-    
-    Args:
-        url: Camera stream URL
-        queue: Queue to store retrieved image
-        timeout: Maximum wait time in seconds
-    """
-    try:
-        resp = urllib.request.urlopen(url, timeout=timeout)
-        img_np = np.array(bytearray(resp.read()), dtype=np.uint8)
-        img = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
-        queue.append(img)
-    except Exception as e:
-        print(f"Timeout or error fetching image from {url}: {e}")
-        queue.append(None)
-
-
-def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
-    """
-    Updates camera configuration via HTTP POST
-    
-    Args:
-        esp32_config_url: Camera configuration endpoint
-        jpeg_quality: JPEG compression quality (0-63)
-        frame_size: Resolution setting (e.g., "FRAMESIZE_VGA")
-        
-    Returns:
-        bool: True if configuration was successful, False otherwise
-    """
-    data = {'jpeg_quality': jpeg_quality, 'frame_size': frame_size}
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    try:
-        response = requests.post(esp32_config_url, data=data, headers=headers, timeout=CONFIG_TIMEOUT)
-        print(f"Response from ESP32: {response.text}")
-        return True
-    except requests.RequestException as e:
-        print(f"Error sending request: {e}")
-        return False
-
-
 def get_stereo_images(url_left, url_right):
     """
     Captures synchronized images from both cameras
@@ -229,35 +192,6 @@ def get_stereo_images(url_left, url_right):
     img_right = queue_right[0]
 
     return img_left, img_right
-
-
-def rectify_left_image(image):
-    """
-    Applies stereo rectification to left camera image
-    
-    Args:
-        image: Left camera image
-    
-    Returns:
-        ndarray: Rectified left image
-    """
-    image_rectified = cv2.remap(image, stereoMapL_x, stereoMapL_y, cv2.INTER_LINEAR)
-    return image_rectified
-
-
-def rectify_right_image(image):
-    """
-    Applies stereo rectification to right camera image
-    
-    Args:
-        image: Right camera image
-    
-    Returns:
-        ndarray: Rectified right image
-    """
-    image_rectified = cv2.remap(image, stereoMapR_x, stereoMapR_y, cv2.INTER_LINEAR)
-    return image_rectified
-
 
 def main():
     """
@@ -328,7 +262,6 @@ def main():
     # Report performance metrics
     average_face_rec_time = total_face_rec_time / face_rec_iterations
     print(f"Average face_rec calculation time over {face_rec_iterations} iterations: {average_face_rec_time:.3f} seconds")
-
 
 if __name__ == "__main__":
     main()

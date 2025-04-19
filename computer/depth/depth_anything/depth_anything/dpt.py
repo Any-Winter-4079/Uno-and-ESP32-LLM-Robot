@@ -4,7 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
 
-from depth_anything.depth_anything.blocks import FeatureFusionBlock, _make_scratch
+from .blocks import FeatureFusionBlock, _make_scratch
+
+from bootstrap import resolve_dinov2_path
 
 #################
 # Description   #
@@ -168,9 +170,18 @@ class DPT_DINOv2(nn.Module):
         
         # in case the Internet connection is not stable, please load the DINOv2 locally
         if localhub:
-            self.pretrained = torch.hub.load('depth_anything/torchhub/facebookresearch_dinov2_main', 'dinov2_{:}14'.format(encoder), source='local', pretrained=False)
+            local_path = resolve_dinov2_path()
+            self.pretrained = torch.hub.load(
+                local_path,
+                f'dinov2_{encoder}14',
+                source='local',
+                pretrained=False
+            )
         else:
-            self.pretrained = torch.hub.load('depth_anything/facebookresearch/dinov2', 'dinov2_{:}14'.format(encoder))
+            self.pretrained = torch.hub.load(
+                'facebookresearch/dinov2',
+                f'dinov2_{encoder}14'
+            )
         
         dim = self.pretrained.blocks[0].attn.qkv.in_features
         

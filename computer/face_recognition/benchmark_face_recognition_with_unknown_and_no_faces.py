@@ -11,10 +11,16 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import time
 import numpy as np
 from deepface import DeepFace
 import matplotlib.pyplot as plt
+from face_recognition.run_face_recognition import get_top_predictions
+from face_recognition.benchmark_face_recognition_with_known_faces import plot_recognition_times
 
 # Configuration
 BACKENDS = [
@@ -116,30 +122,6 @@ def validate_recognition(prediction, test_image_file):
 
     return correct_identification, correct_non_identification, identification_types
 
-
-def get_top_predictions(dfs_list):
-    """
-    Extracts top predictions from recognition results
-    
-    Args:
-        dfs_list: List of dataframes containing recognition results
-    
-    Returns:
-        list: Top prediction for each detected face
-    """
-    # The list can have more than one dataframe if there are multiple faces.
-    # One dataframe per face.
-    # Each dataframe has one or more rows, from most likely to least likely
-    # while meeting the threshold.
-    top_predictions = []
-    if dfs_list is not None:
-        for df in dfs_list:
-            if len(df) > 0:
-                top_prediction = df.iloc[0]
-                top_predictions.append(top_prediction)
-    return top_predictions
-
-
 def recognize_face(test_image_path, backend=BACKEND):
     """
     Recognizes faces in an image using DeepFace
@@ -166,45 +148,6 @@ def recognize_face(test_image_path, backend=BACKEND):
         return top_predictions  # return top prediction for each face in the image
     except Exception as e:
         print(f"\nAn error occurred recognizing {test_image_path} with model {MODEL} and backend {backend}: {e}\n")
-
-
-def plot_recognition_times():
-    """
-    Plots recognition processing time for each test image
-    
-    Builds the model first for faster performance, and measures the time
-    taken to recognize faces in each test image using the specified backend.
-    """
-    # Build model for faster performance, but at the same time, building the model
-    # is what (I think) takes the most time, so if we looped here for >1 backend,
-    # the first backend would seemingly have a spike in the first image,
-    # while the other backends would not (because they would take advantage of the
-    # already built model). But given the purpose is to see the spike,
-    # we leave it this way.
-    DeepFace.build_model(MODEL)
-  
-    times = []
-    test_image_files = sorted([f for f in os.listdir(TEST_IMAGES_PATH) if os.path.isfile(os.path.join(TEST_IMAGES_PATH, f))])
-  
-    # Process each test image and measure recognition time
-    for test_image_file in test_image_files:
-        test_image_path = os.path.join(TEST_IMAGES_PATH, test_image_file)
-        start_time = time.time()
-        _ = recognize_face(test_image_path)
-        end_time = time.time()
-        times.append(end_time - start_time)
-  
-    # Create visualization
-    plt.figure(figsize=(10, 6))
-    plt.bar(range(len(test_image_files)), times, edgecolor='black', color='#4BA081',)
-    plt.xlabel('Test image')
-    plt.ylabel('Recognition time (s)')
-    plt.title(f'Recognition times for {BACKEND} and {MODEL}')
-    plt.xticks(range(len(test_image_files)), labels=[f.split('.')[0] for f in test_image_files], rotation=90)
-    plt.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5)
-    plt.tight_layout()
-    plt.show()
-
 
 def test_backends():
     """
@@ -339,7 +282,6 @@ def test_backends():
         print(f"\tCorrect non-identifications: {correct_non_identifications[backends.index(backend)]}")
         print(f"\tIdentification types: {results[backend]['identification_types']}\n")
 
-
 if __name__ == "__main__":
     test_backends()
-    #plot_recognition_times()  # Run without running test_backends() to account for the model building time
+    plot_recognition_times()  # Run without running test_backends() to account for the model building time

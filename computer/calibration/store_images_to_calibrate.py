@@ -18,13 +18,14 @@ import urllib.request
 from datetime import datetime
 
 # Network configuration
-USE_HOTSPOT = False  # True for phone hotspot, False for home WiFi
+USE_HOTSPOT = True  # True for phone hotspot, False for home WiFi
 IP_LEFT = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"  # Left eye (AI-Thinker ESP32-CAM)
 IP_RIGHT = "172.20.10.10" if USE_HOTSPOT else "192.168.1.180"  # Right eye (M5Stack Wide ESP32-CAM)
 
 # Camera settings
-JPEG_QUALITY = 6  # 0-63, lower means higher quality (12 recommended for production)
-FRAME_SIZE = "FRAMESIZE_VGA"  # 640x480 (also used in production)
+JPEG_QUALITY = 6                # 0-63, lower means higher quality (12 recommended for production)
+FRAME_SIZE = "FRAMESIZE_VGA"    # 640x480 (also used in production)
+CONFIG_TIMEOUT = 5              # seconds
 
 # Image endpoints
 ESP32_RIGHT_IMAGE_URL = f"http://{IP_RIGHT}/image.jpg"
@@ -40,25 +41,27 @@ SAVE_PATH_LEFT = "./images/left_eye"
 FRAME_INTERVAL = 3  # Seconds to wait between frames (time to press 's')
 NUM_IMAGES = 100  # Total number of image pairs to attempt capturing
 
-
 def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
     """
-    Updates ESP32-CAM configuration via HTTP POST request
+    Updates camera configuration via HTTP POST
     
     Args:
-        esp32_config_url: Configuration endpoint URL
-        jpeg_quality: JPEG compression level (0-63, lower is better)
-        frame_size: Resolution identifier (e.g., "FRAMESIZE_VGA")
+        esp32_config_url: Camera configuration endpoint
+        jpeg_quality: JPEG compression quality (0-63)
+        frame_size: Resolution setting (e.g., "FRAMESIZE_VGA")
+        
+    Returns:
+        bool: True if configuration was successful, False otherwise
     """
     data = {'jpeg_quality': jpeg_quality, 'frame_size': frame_size}
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    
     try:
-        response = requests.post(esp32_config_url, data=data, headers=headers)
+        response = requests.post(esp32_config_url, data=data, headers=headers, timeout=CONFIG_TIMEOUT)
         print(f"Response from ESP32: {response.text}")
+        return True
     except requests.RequestException as e:
-        print(f"Error sending configuration request: {e}")
-
+        print(f"Error sending request: {e}")
+        return False
 
 def fetch_image(url, queue):
     """
@@ -76,7 +79,6 @@ def fetch_image(url, queue):
     except urllib.error.URLError as e:
         print(f"Error fetching image from {url}: {e}")
         queue.append(None)
-
 
 def capture_stereo_images(url_left, url_right, save_path_left, save_path_right):
     """
@@ -127,7 +129,6 @@ def capture_stereo_images(url_left, url_right, save_path_left, save_path_right):
         return True
     return False
 
-
 def main():
     """
     Main execution function:
@@ -167,7 +168,6 @@ def main():
 
     cv2.destroyAllWindows()
     print(f"\nStereo image capturing completed. {saved_count} image pairs saved.")
-
 
 if __name__ == "__main__":
     main()

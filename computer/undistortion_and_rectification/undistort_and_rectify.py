@@ -10,6 +10,10 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import cv2
 import glob
 import numpy as np
@@ -27,7 +31,6 @@ camera_matrix_right = np.load('../calibration/parameters/camera_matrix_right_eye
 dist_coeffs_right = np.load('../calibration/parameters/distortion_coeffs_right_eye.npy')
 R = np.load('../calibration/parameters/rotation_matrix.npy')
 T = np.load('../calibration/parameters/translation_vector.npy')
-
 
 def initialize_stereo_rectification(
     image_size,
@@ -76,7 +79,6 @@ def initialize_stereo_rectification(
     
     return stereoMapL, stereoMapR, Q
 
-
 def save_stereo_maps(
     stereoMapL,
     stereoMapR,
@@ -101,7 +103,6 @@ def save_stereo_maps(
     np.save(os.path.join(directory, 'stereoMapR_x.npy'), stereoMapR[0])
     np.save(os.path.join(directory, 'stereoMapR_y.npy'), stereoMapR[1])
     np.save(os.path.join(directory, 'Q.npy'), Q)
-
 
 def process_images(
     left_images_dir,
@@ -160,7 +161,6 @@ def process_images(
 
         print(f"Processed and saved {left_img_path} and {right_img_path}")
 
-
 def main():
     """
     Main execution function:
@@ -172,7 +172,6 @@ def main():
     process_images(LEFT_EYE_IMAGES_DIR, RIGHT_EYE_IMAGES_DIR, OUTPUT_DIR)
     print(f"Process complete. Rectified images saved to {OUTPUT_DIR}")
     print(f"Stereo rectification maps saved to {STEREO_MAPS_DIR}")
-
 
 if __name__ == "__main__":
     main()

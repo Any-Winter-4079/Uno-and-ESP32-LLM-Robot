@@ -11,6 +11,10 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import time
 import numpy as np
 from deepface import DeepFace
@@ -91,7 +95,6 @@ def validate_recognition(prediction, test_image_file):
     # Return 1 for match, 0 for mismatch
     return 1 if predicted_name == actual_name else 0
 
-
 def recognize_face(test_image_path, backend=BACKEND):
     """
     Recognizes a face in an image using DeepFace
@@ -120,7 +123,6 @@ def recognize_face(test_image_path, backend=BACKEND):
         return face.iloc[0] if len(face) > 0 else None
     except Exception as e:
         print(f"\nAn error occurred recognizing {test_image_path} with model {MODEL} and backend {backend}: {e}\n")
-
 
 def plot_recognition_times():
     """
@@ -158,7 +160,6 @@ def plot_recognition_times():
     plt.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5)
     plt.tight_layout()
     plt.show()
-
 
 def plot_backend_comparison(results, test_image_files):
     """
@@ -205,7 +206,6 @@ def plot_backend_comparison(results, test_image_files):
     fig.tight_layout()
     plt.title(f'Correct predictions (bars) and average time (lines) for {MODEL} and {DISTANCE_METRIC}.')
     plt.show()
-
 
 def test_backends():
     """
@@ -255,7 +255,6 @@ def test_backends():
         print(f"\tAverage time: {average_times[backends.index(backend)]:.4f} seconds")
         print(f"\tCorrect predictions: {correct_predictions[backends.index(backend)]} out of {len(test_image_files)}\n")
 
-
 if __name__ == "__main__":
     test_backends()
-    #plot_recognition_times()  # Run without running test_backends() to account for the model building time
+    plot_recognition_times()  # Run without running test_backends() to account for the model building time

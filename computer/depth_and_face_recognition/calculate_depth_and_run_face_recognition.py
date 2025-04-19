@@ -13,14 +13,22 @@ Features:
 """
 
 import os
-import re
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import cv2
-import requests
 import threading
 import numpy as np
 import urllib.request
 from ultralytics import YOLO
 from deepface import DeepFace
+from calibration.store_images_to_calibrate import update_camera_config
+from face_recognition.run_face_recognition import get_top_predictions, draw_boxes_and_labels
+from depth.calculate_disparity_map_on_face_detection_with_SGBM import calculate_disparity_maps, on_min_disparity_change, \
+on_num_disparities_change, on_block_size_change, on_speckle_window_size_change, on_speckle_range_change, \
+on_mode_change, on_uniqueness_ratio_change, on_pre_filter_cap_change, on_disp12max_diff_change, stereo
+from depth.calculate_depth_with_depth_anything import rectify_right_image, rectify_left_image
 
 # Configuration
 JPEG_QUALITY = 12                # 0-63 lower means higher quality
@@ -83,64 +91,12 @@ stereoMapR_x = np.load(os.path.join(STEREO_MAPS_DIR, 'stereoMapR_x.npy'))
 stereoMapR_y = np.load(os.path.join(STEREO_MAPS_DIR, 'stereoMapR_y.npy'))
 Q = np.load(os.path.join(STEREO_MAPS_DIR, 'Q.npy'))
 
-# Initialize stereo matcher
-stereo = cv2.StereoSGBM_create(minDisparity=MIN_DISPARITY,
-                               numDisparities=NUM_DISPARITIES,
-                               blockSize=STEREO_BLOCK_SIZE,
-                               P1=8 * STEREO_BLOCK_SIZE**2,
-                               P2=32 * STEREO_BLOCK_SIZE**2,
-                               disp12MaxDiff=DISP12MAX_DIFF,
-                               preFilterCap=PRE_FILTER_CAP,
-                               uniquenessRatio=UNIQUENESS_RATIO,
-                               speckleWindowSize=SPECKLE_WINDOW_SIZE,
-                               speckleRange=SPECKLE_RANGE,
-                               mode=MODE)
-
 # Initialize object detection
 object_detection_model = YOLO("yolov8n.pt")
 
 # Load object class names
 with open(os.path.join(COCO_NAMES_DIR, 'coco.names'), "r") as f:
     classes = [line.strip() for line in f.readlines()]
-
-#############################
-# Stereo parameter controls #
-#############################
-def on_min_disparity_change(val):
-    global stereo
-    stereo.setMinDisparity(val)
-
-def on_num_disparities_change(val):
-    global stereo
-    stereo.setNumDisparities(max(16, (val // 16) * 16))
-
-def on_block_size_change(val):
-    global stereo
-    stereo.setBlockSize(val if val % 2 == 1 else val + 1)
-
-def on_speckle_window_size_change(val):
-    global stereo
-    stereo.setSpeckleWindowSize(val)
-
-def on_speckle_range_change(val):
-    global stereo
-    stereo.setSpeckleRange(val)
-
-def on_mode_change(val):
-    global stereo
-    stereo.setMode(cv2.STEREO_SGBM_MODE_HH if val == 0 else cv2.STEREO_SGBM_MODE_SGBM_3WAY)
-
-def on_uniqueness_ratio_change(val):
-    global stereo
-    stereo.setUniquenessRatio(val)
-
-def on_pre_filter_cap_change(val):
-    global stereo
-    stereo.setPreFilterCap(val)
-
-def on_disp12max_diff_change(val):
-    global stereo
-    stereo.setDisp12MaxDiff(val)
 
 # Create window and trackbars for stereo parameter adjustment
 cv2.namedWindow("Disparity map")
@@ -153,45 +109,6 @@ cv2.createTrackbar("Mode", "Disparity map", 0, 1, on_mode_change)
 cv2.createTrackbar("Uniq. Ratio", "Disparity map", UNIQUENESS_RATIO, 60, on_uniqueness_ratio_change)
 cv2.createTrackbar("Pre Filter Cap", "Disparity map", PRE_FILTER_CAP, 100, on_pre_filter_cap_change)
 cv2.createTrackbar("Disp12MaxDiff", "Disparity map", DISP12MAX_DIFF, 60, on_disp12max_diff_change)
-
-def draw_boxes_and_labels(img_rectified, unique_individuals):
-    """
-    Draws bounding boxes and name labels for recognized faces
-    
-    Args:
-        img_rectified: Rectified image to draw on
-        unique_individuals: Dictionary of recognized individuals with their info
-    """
-    for person_name, info in unique_individuals.items():
-        x, y, w, h = info['source_x'], info['source_y'], info['source_w'], info['source_h']
-        
-        # Format the display name by removing numbers and underscores
-        identity = person_name
-        identity = re.sub(r'_\d+$', '', identity)
-        identity = identity.replace('_', ' ')
-        
-        # Draw bounding box and name label
-        cv2.rectangle(img_rectified, (x, y), (x+w, y+h), (0, 255, 0), 2)
-        cv2.putText(img_rectified, identity, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-
-def get_top_predictions(dfs_list):
-    """
-    Extracts the top prediction for each detected face
-    
-    Args:
-        dfs_list: List of dataframes containing recognition results
-    
-    Returns:
-        list: Top prediction for each detected face
-    """
-    top_predictions = []
-    for df in dfs_list:
-        if len(df) > 0:
-            top_prediction = df.iloc[0]
-            top_predictions.append(top_prediction)
-    return top_predictions
-
 
 def process_predictions(top_predictions):
     """
@@ -213,7 +130,6 @@ def process_predictions(top_predictions):
         if person_name not in unique_individuals:
             unique_individuals[person_name] = prediction
     return unique_individuals
-
 
 def recognize_face(test_image_path):
     """
@@ -244,7 +160,6 @@ def recognize_face(test_image_path):
         print(f"\nAn error occurred recognizing {test_image_path} with model {MODEL} and backend {BACKEND}: {e}\n")
         return None
 
-
 def fetch_image_with_timeout(url, queue, timeout=STREAM_TIMEOUT):
     """
     Fetches an image from a camera URL with timeout protection
@@ -262,24 +177,6 @@ def fetch_image_with_timeout(url, queue, timeout=STREAM_TIMEOUT):
     except Exception as e:
         print(f"Timeout or error fetching image from {url}: {e}")
         queue.append(None)
-
-
-def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
-    """
-    Updates camera configuration via HTTP POST
-    
-    Args:
-        esp32_config_url: Camera configuration endpoint
-        jpeg_quality: JPEG compression quality (0-63)
-        frame_size: Resolution setting (e.g., "FRAMESIZE_VGA")
-    """
-    data = {'jpeg_quality': jpeg_quality, 'frame_size': frame_size}
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    try:
-        response = requests.post(esp32_config_url, data=data, headers=headers)
-        print(f"Response from ESP32: {response.text}")
-    except requests.RequestException as e:
-        print(f"Error sending request: {e}")
 
 def get_object_bounding_boxes(image, label_filter=None):
     """
@@ -307,7 +204,6 @@ def get_object_bounding_boxes(image, label_filter=None):
             filtered_labels.append(classes[cls])
             
     return filtered_bboxes, filtered_labels
-
 
 def calculate_average_depth(points_3D, bbox, allowed_depth=0.95):
     """
@@ -342,7 +238,6 @@ def calculate_average_depth(points_3D, bbox, allowed_depth=0.95):
     average_depth = np.mean(filtered_depths)
     return average_depth
 
-
 def get_stereo_images(url_left, url_right):
     """
     Captures synchronized images from both cameras
@@ -369,58 +264,6 @@ def get_stereo_images(url_left, url_right):
     img_right = queue_right[0]
     
     return img_left, img_right
-
-def rectify_left_image(image):
-    """
-    Applies stereo rectification to left camera image
-    
-    Args:
-        image: Left camera image
-    
-    Returns:
-        ndarray: Rectified left image
-    """
-    image_rectified = cv2.remap(image, stereoMapL_x, stereoMapL_y, cv2.INTER_LINEAR)
-    return image_rectified
-
-
-def rectify_right_image(image):
-    """
-    Applies stereo rectification to right camera image
-    
-    Args:
-        image: Right camera image
-    
-    Returns:
-        ndarray: Rectified right image
-    """
-    image_rectified = cv2.remap(image, stereoMapR_x, stereoMapR_y, cv2.INTER_LINEAR)
-    return image_rectified
-
-
-def calculate_disparity_maps(stereo, left_img_rectified, right_img_rectified):
-    """
-    Computes disparity map and 3D points from rectified stereo pair
-    
-    Args:
-        stereo: StereoSGBM matcher object
-        left_img_rectified: Rectified left image
-        right_img_rectified: Rectified right image
-    
-    Returns:
-        tuple: (normalized_disparity_map, 3D_points)
-    """
-    # Compute disparity map
-    disparity = stereo.compute(left_img_rectified, right_img_rectified)
-    
-    # Normalize for visualization
-    disp_norm = cv2.normalize(disparity, None, alpha=0, beta=255, 
-                            norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    
-    # Calculate 3D coordinates
-    points_3D = cv2.reprojectImageTo3D(disparity, Q)
-    
-    return disp_norm, points_3D
 
 def preprocess_frames():
     """

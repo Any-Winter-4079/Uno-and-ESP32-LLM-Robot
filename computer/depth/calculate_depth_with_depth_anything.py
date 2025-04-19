@@ -11,20 +11,24 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import cv2
 import time
-import requests
 import threading
 import numpy as np
 import urllib.request
-from depth_anything.run import get_depth
-from depth_anything.depth_anything.dpt import DepthAnything
-from depth_anything.metric_depth.zoedepth.utils.geometry import depth_to_points
+from depth.depth_anything.run import get_depth
+from depth.depth_anything.depth_anything.dpt import DepthAnything
+from calibration.store_images_to_calibrate import update_camera_config
+from depth.depth_anything.metric_depth.zoedepth.utils.geometry import depth_to_points
 
 # Configuration
 JPEG_QUALITY = 12                # 0-63 lower means higher quality
 FRAME_SIZE = "FRAMESIZE_VGA"     # 640x480 resolution
-USE_HOTSPOT = False
+USE_HOTSPOT = True
 RIGHT_EYE_IP = "172.20.10.10" if USE_HOTSPOT else "192.168.1.180"
 LEFT_EYE_IP = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"
 STREAM_TIMEOUT = 3               # seconds
@@ -42,7 +46,6 @@ stereoMapL_x = np.load(os.path.join(stereo_maps_dir, 'stereoMapL_x.npy'))
 stereoMapL_y = np.load(os.path.join(stereo_maps_dir, 'stereoMapL_y.npy'))
 stereoMapR_x = np.load(os.path.join(stereo_maps_dir, 'stereoMapR_x.npy'))
 stereoMapR_y = np.load(os.path.join(stereo_maps_dir, 'stereoMapR_y.npy'))
-Q = np.load(os.path.join(stereo_maps_dir, 'Q.npy'))
 
 # Initialize Depth Anything model
 encoder = 'vits'                 # can also be 'vitb' or 'vitl'
@@ -65,28 +68,6 @@ def fetch_image_with_timeout(url, queue, timeout=STREAM_TIMEOUT):
     except Exception as e:
         print(f"Timeout or error fetching image from {url}: {e}")
         queue.append(None)
-
-def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
-    """
-    Updates camera configuration via HTTP POST
-    
-    Args:
-        esp32_config_url: Camera configuration endpoint
-        jpeg_quality: JPEG compression quality (0-63)
-        frame_size: Resolution setting (e.g., "FRAMESIZE_VGA")
-        
-    Returns:
-        bool: True if configuration was successful, False otherwise
-    """
-    data = {'jpeg_quality': jpeg_quality, 'frame_size': frame_size}
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    try:
-        response = requests.post(esp32_config_url, data=data, headers=headers, timeout=CONFIG_TIMEOUT)
-        print(f"Response from ESP32: {response.text}")
-        return True
-    except requests.RequestException as e:
-        print(f"Error sending request: {e}")
-        return False
 
 def get_stereo_images(url_left, url_right):
     """

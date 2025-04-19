@@ -10,16 +10,19 @@ Features:
 """
 
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import bootstrap
+
 import cv2
 import time
-import requests
-import threading
 import numpy as np
-import urllib.request
 import mediapipe as mp
+from calibration.store_images_to_calibrate import update_camera_config
+from depth.calculate_depth_with_depth_anything import get_stereo_images, rectify_left_image, rectify_right_image
 
 # Network and camera configuration
-USE_HOTSPOT = False
+USE_HOTSPOT = True
 RIGHT_EYE_IP = "172.20.10.10" if USE_HOTSPOT else "192.168.1.180"
 LEFT_EYE_IP = "172.20.10.11" if USE_HOTSPOT else "192.168.1.181"
 STREAM_TIMEOUT = 3  # seconds
@@ -121,41 +124,6 @@ cv2.createTrackbar("Uniq. Ratio", "Disparity map", UNIQUENESS_RATIO, 60, on_uniq
 cv2.createTrackbar("Pre Filter Cap", "Disparity map", PRE_FILTER_CAP, 100, on_pre_filter_cap_change)
 cv2.createTrackbar("Disp12MaxDiff", "Disparity map", DISP12MAX_DIFF, 60, on_disp12max_diff_change)
 
-def fetch_image_with_timeout(url, queue, timeout=STREAM_TIMEOUT):
-   """
-   Fetches an image from a camera URL with timeout protection
-   
-   Args:
-       url: Camera stream URL
-       queue: Queue to store retrieved image
-       timeout: Maximum wait time in seconds
-   """
-   try:
-       resp = urllib.request.urlopen(url, timeout=timeout)
-       img_np = np.array(bytearray(resp.read()), dtype=np.uint8)
-       img = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
-       queue.append(img)
-   except Exception as e:
-       print(f"Timeout or error fetching image from {url}: {e}")
-       queue.append(None)
-
-def update_camera_config(esp32_config_url, jpeg_quality, frame_size):
-   """
-   Updates camera configuration via HTTP POST
-   
-   Args:
-       esp32_config_url: Camera configuration endpoint
-       jpeg_quality: JPEG compression quality (0-63)
-       frame_size: Resolution setting (e.g., "FRAMESIZE_VGA")
-   """
-   data = {'jpeg_quality': jpeg_quality, 'frame_size': frame_size}
-   headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-   try:
-       response = requests.post(esp32_config_url, data=data, headers=headers)
-       print(f"Response from ESP32: {response.text}")
-   except requests.RequestException as e:
-       print(f"Error sending request: {e}")
-
 def get_face_centroid(image):
    """
    Detects face in image and returns its centroid coordinates
@@ -177,46 +145,6 @@ def get_face_centroid(image):
        x, y, w, h = bboxC.xmin, bboxC.ymin, bboxC.width, bboxC.height
        return (x + w / 2, y + h / 2)
    return None
-
-def get_stereo_images(url_left, url_right):
-   """
-   Captures synchronized images from both cameras
-   
-   Args:
-       url_left: Left camera URL
-       url_right: Right camera URL
-   
-   Returns:
-       tuple: (left_image, right_image)
-   """
-   queue_left, queue_right = [], []
-
-   # Start parallel image capture threads
-   thread_left = threading.Thread(target=fetch_image_with_timeout, args=(url_left, queue_left))
-   thread_right = threading.Thread(target=fetch_image_with_timeout, args=(url_right, queue_right))
-   
-   thread_left.start()
-   thread_right.start()
-   thread_left.join()
-   thread_right.join()
-
-   return queue_left[0], queue_right[0]
-
-def rectify_images(img_left, img_right):
-   """
-   Applies stereo rectification to image pair
-   
-   Args:
-       img_left: Left camera image
-       img_right: Right camera image
-   
-   Returns:
-       tuple: (rectified_left, rectified_right)
-   """
-   # Apply rectification maps to both images
-   img_left_rectified = cv2.remap(img_left, stereoMapL_x, stereoMapL_y, cv2.INTER_LINEAR)
-   img_right_rectified = cv2.remap(img_right, stereoMapR_x, stereoMapR_y, cv2.INTER_LINEAR)
-   return img_left_rectified, img_right_rectified
 
 def calculate_disparity_maps(stereo, left_img_rectified, right_img_rectified):
    """
@@ -279,7 +207,8 @@ def main():
 
        if img_left is not None and img_right is not None:
            stream_active = True
-           img_left_rectified, img_right_rectified = rectify_images(img_left, img_right)
+           img_left_rectified = rectify_left_image(img_left)
+           img_right_rectified = rectify_right_image(img_right)
 
            # Detect faces and measure timing
            face_start = time.time()
